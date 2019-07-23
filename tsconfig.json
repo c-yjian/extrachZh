@@ -7,6 +7,6 @@
     "outDir": "./dist",
     "esModuleInterop": true
   },
-  "include": ["src"],
+  "include": ["index.ts", "util"],
   "exclude": ["node_modules", "test"]
 }
