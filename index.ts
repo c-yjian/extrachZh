@@ -1,4 +1,4 @@
-import {ReadStream} from "fs";
+import {ReadStream, Stats} from "fs";
 import {Interface} from "readline";
 
 const path = require("path");
@@ -10,6 +10,8 @@ interface IFilesZh {
     lineNum:number
     filepath:string
 }
+
+type RegRes = RegExpMatchArray | null;
 
 class extractZh {
 
@@ -24,17 +26,21 @@ class extractZh {
     //匹配中文的正则
     private zhExp:RegExp = /[^\x00-\xff]+/g;
     //注释正则
-    private annotationExp:RegExp = /^[/|*]/;
-    private annotationExp2:RegExp = /^<!|^<#/;
+    private annotationReg:RegExp = /^[/|*]/;
+    private annotationReg2:RegExp = /^<!|^<#/;
+    //隐藏文件正则
+    private hideFileReg:RegExp = /^\./;
+    //不遍历文件夹黑名单
+    private blackFolderList:string[] = ['node_modules'];
 
     private extractZH(filepath:string, lineStr:string, lineNum:number):void{
         lineStr = lineStr.trim();
-        const { zhExp, annotationExp, annotationExp2, filterAnnotation } = this;
-        let zh:RegExpMatchArray | null = null;
+        const { zhExp, annotationReg, annotationReg2, filterAnnotation } = this;
+        let zh:RegRes = null;
         let zhStr:string;
         if(filterAnnotation){
-            const res:RegExpMatchArray | null = lineStr.match(annotationExp);
-            const res2:RegExpMatchArray | null = lineStr.match(annotationExp2);
+            const res:RegRes = lineStr.match(annotationReg);
+            const res2:RegRes = lineStr.match(annotationReg2);
             // 该行是注释
             if(res || res2) return
         }
@@ -68,8 +74,13 @@ class extractZh {
     };
 
     private recursionDirectory = (folderPath:string):void =>{
+        const { hideFileReg, blackFolderList } = this;
         const readDirArr = fs.readdirSync(folderPath);
         readDirArr.map((fileName:string) => {
+            const res:RegRes = fileName.match(hideFileReg);
+            // 隐藏文件
+            if(res) return
+            if( blackFolderList.indexOf(fileName) > -1 ) return;
             const fileDir = path.join(folderPath, fileName);
             const state = fs.statSync(fileDir);
             if(state.isFile()){
@@ -84,31 +95,36 @@ class extractZh {
 
     private judgePath = (path:any):void => {
         const { readFilesInline } = this;
-        const state = fs.statSync(path);
-        if(state.isFile()){
-            // 文件
-           this.allFilesPathArr.push(path);
-        }else if(state.isDirectory()){
-            // 文件夹
-            this.recursionDirectory(path)
+        try{
+            const state:Stats = fs.statSync(path);
+            if(state.isFile()){
+                // 文件
+                this.allFilesPathArr.push(path);
+            }else if(state.isDirectory()){
+                // 文件夹
+                this.recursionDirectory(path)
+            }
+            this.allFilesNum = this.allFilesPathArr.length;
+            this.allFilesPathArr.map((filePath:string, index:number) =>{
+                readFilesInline(filePath);
+            })
+        }catch (e) {
+            console.log(1111)
+            console.log(e)
         }
-        this.allFilesNum = this.allFilesPathArr.length;
-        this.allFilesPathArr.map((filePath:string, index:number) =>{
-            readFilesInline(filePath);
-        })
     };
 
     /**
      *
-     * path: 用户输入的路劲，即需要将该路径下的所有文件的中文字符串导出
+     * path: 用户输入的路劲，即需要将该路径下的所有文件的中文字符串导出，默认是根目录
      * filterAnnotation: 导出字符串的过程中是否需要忽略注释，默认不过滤
      *
      * */
-    public exportZh = (path:string, filterAnnotation:boolean):void => {
-        this.judgePath(path);
+    public exportZh = (extractPath:string, filterAnnotation:boolean):void => {
+        const rootDir = path.join(__dirname,'../');
+        this.judgePath(extractPath || rootDir);
         filterAnnotation && (this.filterAnnotation = filterAnnotation);
     }
-
 }
 
 module.exports = extractZh;
