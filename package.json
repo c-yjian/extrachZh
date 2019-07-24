@@ -1,9 +1,8 @@
 {
   "name": "extract-zh",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "author": "yangjian, 杨健",
+  "version": "0.9.1",
+  "main": "dist",
+  "author": "yangjian",
   "scripts": {
     "start": "tsc -w",
     "build": "tsc",
@@ -28,6 +27,26 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^12.6.8",
-    "fs-extra": "^8.1.0"
-  }
+    "fs-extra": "^8.1.0",
+    "json-2-csv": "^3.5.5",
+    "node-xlsx": "^0.15.0"
+  },
+  "keywords": [
+    "extract zh",
+    "extract chinese",
+    "extract chinese es6",
+    "extract chinese module",
+    "extract chinese typescript",
+    "extract chinese text",
+    "node tool",
+    "typescript extract zh",
+    ".d.ts extract zh",
+    "declare .d.ts",
+    "extract chinese text with excel",
+    "extract chinese text with csv",
+    "extract chinese text with json",
+    "i18 tool",
+    "internationalization tool"
+  ],
+  "description": "extract chinese text from ur project or specified path"
 }

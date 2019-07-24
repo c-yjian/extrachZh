@@ -4,25 +4,39 @@ import {Interface} from "readline";
 const path = require("path");
 const fs = require("fs-extra");
 const readline = require('readline');
+const converter = require('json-2-csv');
+const xlsx = require('node-xlsx').default;
 
-interface IFilesZh {
+interface IStrInfo {
     zhStr:string
     lineNum:number
     filepath:string
+}
+
+enum ExportType{
+    excel='excel',
+    json = 'json',
+    csv = 'csv'
 }
 
 type RegRes = RegExpMatchArray | null;
 
 class extractZh {
 
-    //存放传入路径下的所有文件
+    // 当前项目的根路径
+    private rootDir:string = path.join(__dirname,'../');
+    //用户传入提取文件（夹）名
+    private extractFolder:string = path.basename(this.rootDir);
+    //导出文件类型，默认是excel
+    private exportType:ExportType = ExportType.excel;
+    // 存放传入路径下的所有文件
     private allFilesPathArr:string[] = [];
-    //记录需要读取的文件数量
+    // 记录需要读取的文件数量
     private allFilesNum:number = 0;
-    //是否需要过滤注释中的中文
+    // 是否需要过滤注释中的中文
     private filterAnnotation:boolean = false;
-    //存放所有文件中提取出的中文
-    private allFilesZhArr:IFilesZh[] = [];
+    // 存放所有文件中提取出的中文
+    private allFilesZhArr:IStrInfo[] = [];
     //匹配中文的正则
     private zhExp:RegExp = /[^\x00-\xff]+/g;
     //注释正则
@@ -32,6 +46,34 @@ class extractZh {
     private hideFileReg:RegExp = /^\./;
     //不遍历文件夹黑名单
     private blackFolderList:string[] = ['node_modules'];
+    private excelTitle:string[] = ['中文字符串', '所在行数', '文件所在路径'];
+
+    private exportFile = () =>{
+        const { allFilesZhArr, excelTitle, extractFolder, exportType } = this;
+        const fileName:string = `${extractFolder}-extract-zh`;
+        const excelDataArr:any = [excelTitle];
+        const JsonStr = JSON.stringify({
+            extractZh:allFilesZhArr
+        });
+        console.log(JsonStr);
+        if(exportType === ExportType.csv){
+            converter.json2csv(allFilesZhArr, (err:Error,csvStr:string) =>{
+                fs.writeFileSync(`${fileName}.csv`, csvStr);
+            });
+        }else if(exportType === ExportType.json){
+            fs.writeFileSync(`${fileName}.json`, JsonStr);
+        }else {
+            allFilesZhArr.map((strInfo:IStrInfo) => {
+                excelDataArr.push([
+                    strInfo.zhStr,
+                    strInfo.lineNum,
+                    strInfo.filepath
+                ])
+            });
+            const excelBuffer = xlsx.build([{name: "mySheetName", data: excelDataArr}]);
+            fs.writeFileSync(`${fileName}.xlsx`, excelBuffer);
+        }
+    };
 
     private extractZH(filepath:string, lineStr:string, lineNum:number):void{
         lineStr = lineStr.trim();
@@ -47,8 +89,8 @@ class extractZh {
         zh = lineStr.match(zhExp);
         zhStr = (zh && zh[0]) as string;
         zh && this.allFilesZhArr.push({
-            lineNum,
             zhStr,
+            lineNum,
             filepath
         });
     }
@@ -68,7 +110,7 @@ class extractZh {
         objReadline.on('close',() => {
             this.allFilesNum --;
             if(this.allFilesNum == 0){
-                console.log(this.allFilesZhArr)
+                this.exportFile();
             }
         });
     };
@@ -109,7 +151,6 @@ class extractZh {
                 readFilesInline(filePath);
             })
         }catch (e) {
-            console.log(1111)
             console.log(e)
         }
     };
@@ -120,10 +161,12 @@ class extractZh {
      * filterAnnotation: 导出字符串的过程中是否需要忽略注释，默认不过滤
      *
      * */
-    public exportZh = (extractPath:string, filterAnnotation:boolean):void => {
-        const rootDir = path.join(__dirname,'../');
-        this.judgePath(extractPath || rootDir);
+    public exportZh = (extractPath?:string, exportType?:ExportType, filterAnnotation?:boolean, ):void => {
+        const { rootDir } = this;
+        extractPath && (this.extractFolder = path.basename(extractPath));
+        exportType && (this.exportType = exportType);
         filterAnnotation && (this.filterAnnotation = filterAnnotation);
+        this.judgePath(extractPath || rootDir);
     }
 }
 
